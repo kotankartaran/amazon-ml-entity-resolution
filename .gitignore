@@ -1,6 +1,38 @@
+# Challenge data - never commit
 dataset/
+
+# Python
 __pycache__/
-*.pyc
-.ipynb_checkpoints/
+*.py[cod]
+*.so
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment / secrets
 .env
+.envrc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
 .DS_Store
+
+# Temporary files
+tempCodeRunnerFile.py
