@@ -77,6 +77,9 @@ ADDRESS_TOP8_MAX_FREQ = 100
 # Maximum target frequency for address-number + strong-token blocking.
 NUMBER_TOKEN_MAX_FREQ = 100
 
+# Maximum target frequency for domain root blocking.
+DOMAIN_ROOT_MAX_FREQ = 100
+
 os.makedirs(
     OUTPUT_DIR,
     exist_ok=True
@@ -173,6 +176,47 @@ ADDRESS_REPLACEMENTS = {
     "terrace": "ter",
     "circle": "cir",
 }
+
+
+TLDS = [
+    ".com", ".org", ".net", ".co.in", ".in", ".io", ".us", ".info",
+    ".biz", ".edu", ".gov", ".co", ".uk", ".ca", ".de"
+]
+
+
+# ============================================================
+# DOMAIN ROOT KEY
+# ============================================================
+
+def create_domain_root_keys(name, country):
+    """
+    Create domain-root / concatenated business name blocking key.
+
+    Strips TLDs (.com, .org, etc.) and legal suffixes, removes non-alphanumeric
+    characters, and concatenates core brand tokens.
+    """
+    country = normalize_country(country)
+    if not name or not country:
+        return []
+
+    raw = str(name).strip().casefold()
+    raw = unidecode(raw)
+
+    cleaned = raw
+    for tld in TLDS:
+        if tld in cleaned:
+            cleaned = cleaned.replace(tld, "")
+
+    cleaned = re.sub(r"[^a-z0-9\s]", " ", cleaned)
+    tokens = [t for t in cleaned.split() if t not in LEGAL_SUFFIXES]
+    if not tokens:
+        return []
+
+    concat_domain = "".join(tokens)
+    if len(concat_domain) < 5:
+        return []
+
+    return [f"{country}|domainroot|{concat_domain}"]
 
 
 # ============================================================
@@ -1224,6 +1268,16 @@ def register_functions(con):
         "VARCHAR[]"
     )
 
+    con.create_function(
+        "create_domain_root_keys",
+        create_domain_root_keys,
+        [
+            "VARCHAR",
+            "VARCHAR"
+        ],
+        "VARCHAR[]"
+    )
+
 
 # ============================================================
 # PRINT CANDIDATE COUNT
@@ -1296,6 +1350,11 @@ def main():
     print(
         f"Number-token frequency limit: "
         f"{NUMBER_TOKEN_MAX_FREQ}"
+    )
+
+    print(
+        f"Domain-root frequency limit: "
+        f"{DOMAIN_ROOT_MAX_FREQ}"
     )
 
 
@@ -3032,6 +3091,143 @@ def main():
     print(
         f"Selective number-token keys: "
         f"{selective_number_token_keys:,}"
+    )
+
+    print(
+        f"Time: {time.time() - t:.2f}s"
+    )
+
+
+    # ========================================================
+    # BLOCK 9
+    # DOMAIN ROOT / CONCATENATED BRAND NAME
+    # ========================================================
+
+    print()
+    print("=" * 70)
+    print(
+        "BLOCK 9: DOMAIN ROOT / CONCATENATED BRAND NAME"
+    )
+    print("=" * 70)
+
+    t = time.time()
+
+    # Generate S1 keys.
+    con.execute(
+        """
+        CREATE TABLE s1_b9 AS
+
+        SELECT
+            source1_entity_id,
+
+            UNNEST(
+                create_domain_root_keys(
+                    business_name,
+                    country
+                )
+            ) AS block_key
+
+        FROM s1_sample
+        """
+    )
+
+    # Generate target keys.
+    con.execute(
+        """
+        CREATE TABLE target_b9_raw AS
+
+        SELECT
+            entity_id,
+
+            UNNEST(
+                create_domain_root_keys(
+                    business_name,
+                    country
+                )
+            ) AS block_key
+
+        FROM all_targets
+        """
+    )
+
+    # Count target frequencies.
+    con.execute(
+        """
+        CREATE TABLE target_b9_frequency AS
+
+        SELECT
+            block_key,
+            COUNT(*) AS frequency
+
+        FROM target_b9_raw
+
+        WHERE block_key <> ''
+
+        GROUP BY block_key
+        """
+    )
+
+    # Keep selective domain root keys.
+    con.execute(
+        """
+        CREATE TABLE target_b9 AS
+
+        SELECT
+            t.entity_id,
+            t.block_key
+
+        FROM target_b9_raw t
+
+        JOIN target_b9_frequency f
+          ON t.block_key = f.block_key
+
+        WHERE
+            t.block_key <> ''
+
+            AND
+
+            f.frequency <= ?
+        """,
+        [
+            DOMAIN_ROOT_MAX_FREQ
+        ]
+    )
+
+    # Join S1 to targets.
+    con.execute(
+        """
+        INSERT INTO candidates
+
+        SELECT DISTINCT
+            s.source1_entity_id,
+            t.entity_id
+
+        FROM s1_b9 s
+
+        JOIN target_b9 t
+          ON s.block_key = t.block_key
+        """
+    )
+
+    print_candidate_count(
+        con,
+        "Block 9"
+    )
+
+    selective_domain_root_keys = con.execute(
+        """
+        SELECT COUNT(*)
+        FROM target_b9_frequency
+        WHERE frequency <= ?
+        """,
+        [
+            DOMAIN_ROOT_MAX_FREQ
+        ]
+    ).fetchone()[0]
+
+    print(
+        f"Selective domain-root keys: "
+        f"{selective_domain_root_keys:,}"
     )
 
     print(
