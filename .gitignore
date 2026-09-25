@@ -38,3 +38,6 @@ htmlcov/
 tempCodeRunnerFile.py
 *.duckdb
 *.duckdb.wal
+
+# Generated candidate pairs - too large for Git
+output/candidate_pairs.tsv

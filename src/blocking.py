@@ -71,6 +71,12 @@ ADDRESS_PAIR_MAX_FREQ = 100
 
 ADDRESS_TRIPLE_MAX_FREQ = 50
 
+# Maximum target frequency for Top-8 address-pair blocking.
+ADDRESS_TOP8_MAX_FREQ = 100
+
+# Maximum target frequency for address-number + strong-token blocking.
+NUMBER_TOKEN_MAX_FREQ = 100
+
 os.makedirs(
     OUTPUT_DIR,
     exist_ok=True
@@ -992,6 +998,91 @@ def create_address_triple_keys(address, country):
 
 
 # ============================================================
+# BLOCK 7 KEY
+# TOP-8 ADDRESS TOKEN PAIRS
+# ============================================================
+
+def create_top8_address_pair_keys(address, country):
+    """
+    Create all order-independent pairs among the top 8
+    strongest address tokens.
+
+    Target-side frequency filtering is applied in the
+    blocking pipeline, not here.
+    """
+
+    country_key = normalize_country(country)
+
+    if not country_key:
+        return []
+
+    tokens = extract_strong_address_tokens(address)
+
+    if len(tokens) < 2:
+        return []
+
+    tokens = sorted(
+        set(tokens),
+        key=lambda x: (-len(x), x)
+    )[:8]
+
+    keys = []
+
+    for i in range(len(tokens)):
+        for j in range(i + 1, len(tokens)):
+
+            keys.append(
+                f"{country_key}|addrtop8|"
+                f"{tokens[i]}|{tokens[j]}"
+            )
+
+    return keys
+
+
+# ============================================================
+# BLOCK 8 KEY
+# ADDRESS NUMBER + STRONG ADDRESS TOKEN
+# ============================================================
+
+def create_number_token_keys(address, country):
+    """
+    Create country + address-number + strong-address-token keys.
+
+    Examples:
+        india|numtoken|204|bangalore
+        us|numtoken|8066|haven
+    """
+
+    country_key = normalize_country(country)
+
+    if not country_key:
+        return []
+
+    numbers = set(
+        extract_address_numbers(address)
+    )
+
+    tokens = set(
+        extract_strong_address_tokens(address)
+    )
+
+    if not numbers or not tokens:
+        return []
+
+    keys = []
+
+    for number in numbers:
+        for token in tokens:
+
+            keys.append(
+                f"{country_key}|numtoken|"
+                f"{number}|{token}"
+            )
+
+    return keys
+
+
+# ============================================================
 # DUCKDB UDF REGISTRATION
 # ============================================================
 
@@ -1113,6 +1204,27 @@ def register_functions(con):
     )
 
 
+    con.create_function(
+        "create_top8_address_pair_keys",
+        create_top8_address_pair_keys,
+        [
+            "VARCHAR",
+            "VARCHAR"
+        ],
+        "VARCHAR[]"
+    )
+
+    con.create_function(
+        "create_number_token_keys",
+        create_number_token_keys,
+        [
+            "VARCHAR",
+            "VARCHAR"
+        ],
+        "VARCHAR[]"
+    )
+
+
 # ============================================================
 # PRINT CANDIDATE COUNT
 # ============================================================
@@ -1174,6 +1286,16 @@ def main():
     print(
         f"Address triple frequency limit: "
         f"{ADDRESS_TRIPLE_MAX_FREQ}"
+    )
+
+    print(
+        f"Top-8 address-pair frequency limit: "
+        f"{ADDRESS_TOP8_MAX_FREQ}"
+    )
+
+    print(
+        f"Number-token frequency limit: "
+        f"{NUMBER_TOKEN_MAX_FREQ}"
     )
 
 
@@ -2641,6 +2763,280 @@ def main():
         f"Time: {time.time() - t:.2f}s"
     )
 
+
+
+    # ========================================================
+    # BLOCK 7
+    # TOP-8 ADDRESS TOKEN PAIRS
+    # ========================================================
+
+    print()
+    print("=" * 70)
+    print(
+        "BLOCK 7: TOP-8 ADDRESS TOKEN PAIRS"
+    )
+    print("=" * 70)
+
+    t = time.time()
+
+    # Generate S1 keys.
+    con.execute(
+        """
+        CREATE TABLE s1_b7 AS
+
+        SELECT
+            source1_entity_id,
+
+            UNNEST(
+                create_top8_address_pair_keys(
+                    business_address,
+                    country
+                )
+            ) AS block_key
+
+        FROM s1_sample
+        """
+    )
+
+    # Generate target keys.
+    con.execute(
+        """
+        CREATE TABLE target_b7_raw AS
+
+        SELECT
+            entity_id,
+
+            UNNEST(
+                create_top8_address_pair_keys(
+                    business_address,
+                    country
+                )
+            ) AS block_key
+
+        FROM all_targets
+        """
+    )
+
+    # Count target frequencies.
+    con.execute(
+        """
+        CREATE TABLE target_b7_frequency AS
+
+        SELECT
+            block_key,
+            COUNT(*) AS frequency
+
+        FROM target_b7_raw
+
+        WHERE block_key <> ''
+
+        GROUP BY block_key
+        """
+    )
+
+    # Keep only selective Top-8 pairs.
+    con.execute(
+        """
+        CREATE TABLE target_b7 AS
+
+        SELECT
+            t.entity_id,
+            t.block_key
+
+        FROM target_b7_raw t
+
+        JOIN target_b7_frequency f
+          ON t.block_key = f.block_key
+
+        WHERE
+            t.block_key <> ''
+
+            AND
+
+            f.frequency <= ?
+        """,
+        [
+            ADDRESS_TOP8_MAX_FREQ
+        ]
+    )
+
+    # Join S1 to targets.
+    con.execute(
+        """
+        INSERT INTO candidates
+
+        SELECT DISTINCT
+            s.source1_entity_id,
+            t.entity_id
+
+        FROM s1_b7 s
+
+        JOIN target_b7 t
+          ON s.block_key = t.block_key
+        """
+    )
+
+    print_candidate_count(
+        con,
+        "Block 7"
+    )
+
+    selective_top8_pairs = con.execute(
+        """
+        SELECT COUNT(*)
+        FROM target_b7_frequency
+        WHERE frequency <= ?
+        """,
+        [
+            ADDRESS_TOP8_MAX_FREQ
+        ]
+    ).fetchone()[0]
+
+    print(
+        f"Selective Top-8 pair keys: "
+        f"{selective_top8_pairs:,}"
+    )
+
+    print(
+        f"Time: {time.time() - t:.2f}s"
+    )
+
+
+    # ========================================================
+    # BLOCK 8
+    # ADDRESS NUMBER + STRONG ADDRESS TOKEN
+    # ========================================================
+
+    print()
+    print("=" * 70)
+    print(
+        "BLOCK 8: ADDRESS NUMBER + STRONG TOKEN"
+    )
+    print("=" * 70)
+
+    t = time.time()
+
+    # Generate S1 keys.
+    con.execute(
+        """
+        CREATE TABLE s1_b8 AS
+
+        SELECT
+            source1_entity_id,
+
+            UNNEST(
+                create_number_token_keys(
+                    business_address,
+                    country
+                )
+            ) AS block_key
+
+        FROM s1_sample
+        """
+    )
+
+    # Generate target keys.
+    con.execute(
+        """
+        CREATE TABLE target_b8_raw AS
+
+        SELECT
+            entity_id,
+
+            UNNEST(
+                create_number_token_keys(
+                    business_address,
+                    country
+                )
+            ) AS block_key
+
+        FROM all_targets
+        """
+    )
+
+    # Count target frequencies.
+    con.execute(
+        """
+        CREATE TABLE target_b8_frequency AS
+
+        SELECT
+            block_key,
+            COUNT(*) AS frequency
+
+        FROM target_b8_raw
+
+        WHERE block_key <> ''
+
+        GROUP BY block_key
+        """
+    )
+
+    # Keep only selective number-token keys.
+    con.execute(
+        """
+        CREATE TABLE target_b8 AS
+
+        SELECT
+            t.entity_id,
+            t.block_key
+
+        FROM target_b8_raw t
+
+        JOIN target_b8_frequency f
+          ON t.block_key = f.block_key
+
+        WHERE
+            t.block_key <> ''
+
+            AND
+
+            f.frequency <= ?
+        """,
+        [
+            NUMBER_TOKEN_MAX_FREQ
+        ]
+    )
+
+    # Join S1 to targets.
+    con.execute(
+        """
+        INSERT INTO candidates
+
+        SELECT DISTINCT
+            s.source1_entity_id,
+            t.entity_id
+
+        FROM s1_b8 s
+
+        JOIN target_b8 t
+          ON s.block_key = t.block_key
+        """
+    )
+
+    print_candidate_count(
+        con,
+        "Block 8"
+    )
+
+    selective_number_token_keys = con.execute(
+        """
+        SELECT COUNT(*)
+        FROM target_b8_frequency
+        WHERE frequency <= ?
+        """,
+        [
+            NUMBER_TOKEN_MAX_FREQ
+        ]
+    ).fetchone()[0]
+
+    print(
+        f"Selective number-token keys: "
+        f"{selective_number_token_keys:,}"
+    )
+
+    print(
+        f"Time: {time.time() - t:.2f}s"
+    )
 
 
     # ========================================================
