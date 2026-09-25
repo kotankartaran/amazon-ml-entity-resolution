@@ -36,3 +36,5 @@ htmlcov/
 
 # Temporary files
 tempCodeRunnerFile.py
+*.duckdb
+*.duckdb.wal
