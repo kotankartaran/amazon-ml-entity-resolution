@@ -22,7 +22,7 @@ BASE_DIR = os.path.dirname(
 
 DATA_DIR = os.environ.get(
     "DATA_DIR",
-    "/Users/kotankartaran/Downloads/student_resource/dataset"
+    "dataset"
 )
 
 TRAIN_DIR = os.path.join(
