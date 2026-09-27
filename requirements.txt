@@ -1,0 +1,8 @@
+duckdb
+Unidecode
+numpy
+pandas
+rapidfuzz
+scikit-learn
+lightgbm
+joblib

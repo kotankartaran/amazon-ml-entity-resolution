@@ -1,43 +1,35 @@
-# Challenge data - never commit
-dataset/
-
-# Python
-__pycache__/
-*.py[cod]
-*.so
-*.egg-info/
-build/
-dist/
-
-# Virtual environments
-.venv/
-venv/
-env/
-ENV/
-
-# Environment / secrets
-.env
-.envrc
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Testing / coverage
-.pytest_cache/
-.coverage
-htmlcov/
-
-# IDE
-.vscode/
-.idea/
-
-# OS
 .DS_Store
-
-# Temporary files
-tempCodeRunnerFile.py
+__pycache__/
+*.pyc
+*.pyo
 *.duckdb
 *.duckdb.wal
+.venv/
+.tmp/
+normalized/
+output/*.parquet
+output/*.zip
+output/matching_chunks/
+output/test_candidate_chunks/
+output/backup_0493/
 
-# Generated candidate pairs - too large for Git
-output/candidate_pairs.tsv
+# Experiment / backup source files
+src/*_backup*.py
+src/*_test*.py
+src/run_ablation_study.py
+src/test_subset_check.py
+src/production_test_blocker_v2.py
+src/generate_test_candidates.py
+src/finalize_candidates.py
+src/analyze_missed.py
+finalize_test_candidates.py
+
+# Local experiment outputs
+output/*.tsv
+output/*.parquet
+output/*.json
+output/*.joblib
+output/*.zip
+output/matching_chunks/
+output/test_candidate_chunks/
+output/backup_0493/
