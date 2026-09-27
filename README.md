@@ -936,35 +936,16 @@ Only the source code, documentation, dependency specification, and validation ut
 
 ---
 
-# 👥 31. Team
+## 👥 31. Team
 
-<table>
-  <tr>
-    <td align="center" width="25%">
-      <b>Chevalla Manasa</b><br/><br/>
-      <a href="https://github.com/manasa-create">GitHub</a> •
-      <a href="https://www.linkedin.com/in/manasa-chevalla-839a0b323/">LinkedIn</a>
-    </td>
+| Team Member | GitHub | LinkedIn |
+|---|---|---|
+| **Chevalla Manasa** | [GitHub](https://github.com/manasa-create) | [LinkedIn](https://www.linkedin.com/in/manasa-chevalla-839a0b323/) |
+| **Gujja Harshith** | [GitHub](https://github.com/harshithhh8) | [LinkedIn](https://www.linkedin.com/in/harshith-gujja-269b01325/) |
+| **Kotankar Taran** | [GitHub](https://github.com/kotankartaran) | [LinkedIn](https://www.linkedin.com/in/kotankar-taran-2a918b324/) |
+| **Muppidi Samhita Reddy** | [GitHub](https://github.com/samhita-reddy) | [LinkedIn](https://www.linkedin.com/in/muppidi-samhita-reddy-94b527324/) |
 
-    <td align="center" width="25%">
-      <b>Gujja Harshith</b><br/><br/>
-      <a href="https://github.com/harshithhh8">GitHub</a> •
-      <a href="https://www.linkedin.com/in/harshith-gujja-269b01325/">LinkedIn</a>
-    </td>
-
-    <td align="center" width="25%">
-      <b>Kotankar Taran</b><br/><br/>
-      <a href="https://github.com/kotankartaran">GitHub</a> •
-      <a href="https://www.linkedin.com/in/kotankar-taran-2a918b324/">LinkedIn</a>
-    </td>
-
-    <td align="center" width="25%">
-      <b>Muppidi Samhita Reddy</b><br/><br/>
-      <a href="https://github.com/samhita-reddy">GitHub</a> •
-      <a href="https://www.linkedin.com/in/muppidi-samhita-reddy-94b527324/">LinkedIn</a>
-    </td>
-  </tr>
-</table>
+### Team Contributions
 
 The team collaborated across:
 
@@ -973,12 +954,8 @@ The team collaborated across:
 - Candidate generation
 - Feature engineering
 - Machine-learning model development
-- Error analysis
-- Validation
-- AWS infrastructure
-- Large-scale inference
+- Evaluation and validation
 - Documentation
-
 ---
 
 # 🚀 32. Project Summary
